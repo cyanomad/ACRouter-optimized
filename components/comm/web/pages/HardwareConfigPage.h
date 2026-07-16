@@ -316,6 +316,8 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                         <option value="">-- Select Sensor --</option>
                     </select>
                     <div class="form-helper">Choose from pre-configured sensor profiles</div>
+                    <input type="hidden" id="adc0-mult" value="1.0">
+                    <input type="hidden" id="adc0-offset" value="0.0">
                 </div>
 
                 <!-- Profile Info Display (shown after selection) -->
@@ -389,6 +391,8 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                         <option value="">-- Select Sensor --</option>
                     </select>
                     <div class="form-helper">Choose from pre-configured sensor profiles</div>
+                    <input type="hidden" id="adc1-mult" value="1.0">
+                    <input type="hidden" id="adc1-offset" value="0.0">
                 </div>
 
                 <!-- Profile Info Display -->
@@ -462,6 +466,8 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                         <option value="">-- Select Sensor --</option>
                     </select>
                     <div class="form-helper">Choose from pre-configured sensor profiles</div>
+                    <input type="hidden" id="adc2-mult" value="1.0">
+                    <input type="hidden" id="adc2-offset" value="0.0">
                 </div>
 
                 <!-- Profile Info Display -->
@@ -535,6 +541,8 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                         <option value="">-- Select Sensor --</option>
                     </select>
                     <div class="form-helper">Choose from pre-configured sensor profiles</div>
+                    <input type="hidden" id="adc3-mult" value="1.0">
+                    <input type="hidden" id="adc3-offset" value="0.0">
                 </div>
 
                 <!-- Profile Info Display -->
@@ -873,6 +881,11 @@ function applySensorProfile(channel, profileId) {
     document.getElementById(`adc${channel}-profile-mult`).textContent = profile.multiplier.toFixed(1);
     document.getElementById(`adc${channel}-profile-offset`).textContent = profile.offset.toFixed(2);
     document.getElementById(`adc${channel}-profile-nominal`).textContent = profile.nominal.toFixed(0);
+
+    // Keep the actual (hidden) form fields in sync so gatherConfig() saves
+    // the real numeric values, not just the display text
+    document.getElementById(`adc${channel}-mult`).value = profile.multiplier;
+    document.getElementById(`adc${channel}-offset`).value = profile.offset;
 
     // Show calibration date if available
     const calibDateEl = document.getElementById(`adc${channel}-profile-calib-date`);
