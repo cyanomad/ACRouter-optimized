@@ -918,6 +918,38 @@ function toggleADCChannel(channel, enabled) {
 }
 
 // ============================================================
+// Find Sensor Profile Matching Saved Calibration
+// ============================================================
+// The backend currently only stores/returns the resulting
+// multiplier + offset for a channel, not which profile id produced
+// them. To restore the "Sensor Profile" dropdown on page load, we
+// look for a profile of the right kind (voltage/current) whose
+// multiplier and offset match what was saved.
+function findProfileIdForChannel(sensorType, multiplier, offset) {
+    const EPS = 0.01;
+    const type = String(sensorType);
+    let bestId = '';
+
+    for (const [id, profile] of Object.entries(SENSOR_PROFILES)) {
+        if (type === '1') {
+            if (profile.sensorType !== 'VOLTAGE_AC') continue;
+        } else if (type === '2' || type === '3' || type === '4') {
+            if (profile.category !== 'sct013' && profile.category !== 'acs712') continue;
+        } else {
+            continue;
+        }
+
+        if (Math.abs(profile.multiplier - multiplier) < EPS &&
+            Math.abs(profile.offset - offset) < EPS) {
+            bestId = id;
+            break;
+        }
+    }
+
+    return bestId;
+}
+
+// ============================================================
 // Load Hardware Configuration
 // ============================================================
 async function loadHardwareConfig() {
@@ -934,8 +966,26 @@ async function loadHardwareConfig() {
         const ch = data.adc_channels[i];
         document.getElementById(`adc${i}-gpio`).value = ch.gpio;
         document.getElementById(`adc${i}-type`).value = ch.type;
-        document.getElementById(`adc${i}-mult`).value = ch.multiplier;
-        document.getElementById(`adc${i}-offset`).value = ch.offset;
+
+        // Rebuild the sensor-profile dropdown for the *actual* saved
+        // type (it must run after adc{i}-type is set above, since
+        // populateSensorProfiles() reads the current type select)
+        populateSensorProfiles(i);
+
+        // Try to restore the previously selected profile, and derive
+        // the profile-info display + hidden mult/offset fields from it
+        const driverSelect = document.getElementById(`adc${i}-driver`);
+        const matchedId = findProfileIdForChannel(ch.type, ch.multiplier, ch.offset);
+        if (matchedId) {
+            driverSelect.value = matchedId;
+            applySensorProfile(i, matchedId);
+        } else {
+            driverSelect.value = '';
+            document.getElementById(`adc${i}-profile-info`).style.display = 'none';
+            document.getElementById(`adc${i}-mult`).value = ch.multiplier;
+            document.getElementById(`adc${i}-offset`).value = ch.offset;
+        }
+
         document.getElementById(`adc${i}-enabled`).checked = ch.enabled;
         toggleADCChannel(i, ch.enabled);
     }
@@ -1117,12 +1167,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     // First, load sensor profiles from backend
     await loadSensorProfiles();
 
-    // Populate sensor profile dropdowns for all channels
-    for (let i = 0; i < 4; i++) {
-        populateSensorProfiles(i);
-    }
-
-    // Load hardware configuration
+    // Load hardware configuration. This also (re)populates each
+    // channel's sensor-profile dropdown using the *actual* saved
+    // sensor type, and restores the previously selected profile -
+    // see loadHardwareConfig().
     loadHardwareConfig();
 });
 </script>
