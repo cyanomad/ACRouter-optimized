@@ -16,6 +16,7 @@
 #include "ConfigManager.h"
 #include "HardwareConfigManager.h"
 #include "SerialCommand.h"
+#include "RemoteLogBuffer.h"
 #include "WiFiManager.h"
 #include "WebServerManager.h"
 #include "NTPManager.h"
@@ -47,6 +48,12 @@ extern "C" void app_main()
     // Setup Serial for debugging
     Serial.begin(115200);
     delay(100);
+
+    // Mirror all ESP_LOG output into an in-memory ring buffer, so the
+    // console log can be read remotely via GET /api/console/log when
+    // there's no USB/UART cable attached. Must run before other init
+    // logging so as much of the boot log as possible gets captured.
+    RemoteLogBuffer::getInstance().begin();
 
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "AC Power Router Controller");
