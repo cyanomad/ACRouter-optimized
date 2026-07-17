@@ -59,6 +59,18 @@ public:
      */
     void printStatus();
 
+    /**
+     * @brief Execute a command coming from a non-serial source (e.g. HTTP)
+     *
+     * Runs the exact same command parser used for Serial input, so
+     * every command (status, debug-adc, gain, etc.) works identically.
+     * Output goes through ESP_LOG as usual - capture it remotely via
+     * RemoteLogBuffer / GET /api/console/log if not connected over UART.
+     *
+     * @param line Command string (e.g. "debug-adc 5")
+     */
+    void executeRemote(const char* line) { executeCommand(line); }
+
 private:
     SerialCommand();
     ~SerialCommand() = default;
