@@ -1493,6 +1493,20 @@ monitor_and_adjust()
 
 ---
 
+### 9.17 Execute console command
+
+POST /api/console — execute console command
+
+EXAMPLE:
+
+curl -X POST http://192.168.0.11/api/console -H "Content-Type: application/json" -d '{"command":"debug-adc 5"}'
+
+
+### 9.18 Clear log buffer
+
+POST /api/console/log/clear — clear log buffer
+
+
 ## Related Documentation
 
 - [07_COMMANDS.md](07_COMMANDS.md) - Commands Reference (RU)
