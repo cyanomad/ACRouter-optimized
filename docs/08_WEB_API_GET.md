@@ -1274,6 +1274,13 @@ done
 
 ---
 
+
+### 8.13 Get console log
+
+GET /api/console/log — return last log
+
+
+
 ## Related Documentation
 
 - [01_OVERVIEW.md](01_OVERVIEW.md) - Project overview
