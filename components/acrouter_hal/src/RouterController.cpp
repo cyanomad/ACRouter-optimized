@@ -86,6 +86,7 @@ void RouterController::update(const PowerMeterADC::Measurements& measurements) {
     m_status.power_grid = power_grid;
     m_status.power_solar = power_solar;
     m_status.power_load = power_load;
+    m_status.voltage_rms = measurements.voltage_rms;
 
     // Process based on current mode
     switch (m_status.mode) {
