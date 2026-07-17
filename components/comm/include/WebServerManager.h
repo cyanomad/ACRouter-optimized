@@ -76,6 +76,11 @@ private:
     // System Control API Handlers
     void handleSystemReboot();       // POST /api/system/reboot
 
+    // Remote Console API Handlers
+    void handleConsoleCommand();     // POST /api/console
+    void handleConsoleLog();         // GET  /api/console/log
+    void handleConsoleLogClear();    // POST /api/console/log/clear
+
     // OTA API Handlers
     void handleOTACheckGitHub();     // GET /api/ota/check-github
     void handleOTAUpdateGitHub();    // POST /api/ota/update-github
