@@ -83,6 +83,7 @@ struct RouterStatus {
     float power_grid;                   ///< Current grid power (W) - from CURRENT_GRID sensor
     float power_solar;                  ///< Current solar power (W) - from CURRENT_SOLAR sensor
     float power_load;                   ///< Current load power (W) - from CURRENT_LOAD sensor
+    float voltage_rms;                  ///< Mains AC RMS voltage (V) - shared by all channels
     float control_gain;                 ///< Current control gain
     float balance_threshold;            ///< Current balance threshold (W)
     uint32_t last_update_ms;            ///< Timestamp of last update
@@ -96,6 +97,7 @@ struct RouterStatus {
         power_grid(0.0f),
         power_solar(0.0f),
         power_load(0.0f),
+        voltage_rms(0.0f),
         control_gain(RouterConfig::DEFAULT_CONTROL_GAIN),
         balance_threshold(RouterConfig::DEFAULT_BALANCE_THRESHOLD),
         last_update_ms(0),
