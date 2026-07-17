@@ -5,6 +5,8 @@
 #include "OTAManager.h"
 #include "GitHubOTAChecker.h"
 #include "MQTTManager.h"
+#include "SerialCommand.h"
+#include "RemoteLogBuffer.h"
 #include <esp_app_desc.h>
 
 // New Material UI Web Interface
@@ -163,6 +165,17 @@ void WebServerManager::setupRoutes() {
     // ========================================
 
     _http_server->on("/api/system/reboot", HTTP_POST, [this]() { handleSystemReboot(); });
+
+    // ========================================
+    // REST API - Remote Console
+    // ========================================
+    // Lets you run the same commands as the USB serial console
+    // (status, debug-adc <sec>, gain <n>, etc.) over WiFi, and read
+    // back the ESP_LOG output without needing a serial cable.
+
+    _http_server->on("/api/console", HTTP_POST, [this]() { handleConsoleCommand(); });
+    _http_server->on("/api/console/log", HTTP_GET, [this]() { handleConsoleLog(); });
+    _http_server->on("/api/console/log/clear", HTTP_POST, [this]() { handleConsoleLogClear(); });
 
     // ========================================
     // REST API - OTA Management
@@ -466,6 +479,10 @@ String WebServerManager::buildMetricsJson() {
     metrics["power_grid"] = st.power_grid;
     metrics["power_solar"] = st.power_solar;
     metrics["power_load"] = st.power_load;
+    // Single shared mains voltage - all three power channels are
+    // measured against the same AC line, there's no separate
+    // grid/solar/load voltage
+    metrics["voltage"] = st.voltage_rms;
 
     // Dimmer levels (array for multiple dimmers)
     JsonArray dimmers = doc["dimmers"].to<JsonArray>();
@@ -1161,6 +1178,70 @@ void WebServerManager::handleSystemReboot() {
     ESP_LOGI(TAG, "Rebooting NOW");
     delay(3000);
     ESP.restart();
+}
+
+// ============================================================
+// Remote Console API
+// ============================================================
+// Runs the exact same commands as the USB serial console
+// (see SerialCommand.cpp for the full list: status, debug-adc <sec>,
+// gain <n>, etc.) so it works over WiFi with no cable attached.
+//
+// Command results go through ESP_LOG like normal, which is now
+// mirrored into RemoteLogBuffer at startup - fetch them with
+// GET /api/console/log.
+
+void WebServerManager::handleConsoleCommand() {
+    if (!_http_server->hasArg("plain")) {
+        sendError(400, "Missing request body");
+        return;
+    }
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, _http_server->arg("plain"));
+
+    if (error) {
+        sendError(400, "Invalid JSON");
+        return;
+    }
+
+    if (!doc["command"].is<const char*>()) {
+        sendError(400, "Missing 'command' field");
+        return;
+    }
+
+    String command = doc["command"].as<String>();
+    if (command.length() == 0) {
+        sendError(400, "Empty command");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Console command via API: %s", command.c_str());
+    SerialCommand::getInstance().executeRemote(command.c_str());
+
+    JsonDocument response;
+    response["success"] = true;
+    response["message"] = "Command executed - see GET /api/console/log for output";
+
+    String json;
+    serializeJson(response, json);
+    sendJsonResponse(200, json);
+}
+
+void WebServerManager::handleConsoleLog() {
+    String log = RemoteLogBuffer::getInstance().getBuffer();
+
+    JsonDocument response;
+    response["log"] = log;
+
+    String json;
+    serializeJson(response, json);
+    sendJsonResponse(200, json);
+}
+
+void WebServerManager::handleConsoleLogClear() {
+    RemoteLogBuffer::getInstance().clear();
+    sendSuccess("Console log cleared");
 }
 
 // ============================================================================
