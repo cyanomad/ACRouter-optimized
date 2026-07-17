@@ -24,6 +24,7 @@
 #define POWER_METER_ADC_H
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include "SensorTypes.h"
 #include "PinDefinitions.h"
 #include "DataTypes.h"
@@ -311,6 +312,47 @@ public:
      */
     uint32_t getDebugPeriod() const { return m_debug_period_sec; }
 
+    // ============================================================
+    // Fallback (NVS) Calibration
+    // ============================================================
+    // Raw-to-voltage conversion normally goes through the ESP-IDF adc_cali API
+    // (curve/line fitting using the SoC's factory eFuse reference), which is
+    // per-device-accurate. Some ESP32 units/eFuse combinations don't support
+    // it (initCalibration() fails); in that case rawToMillivolts() falls back
+    // to a simple linear model (gain + offset) that can be calibrated per
+    // physical device and persisted in NVS, instead of a single hardcoded
+    // constant shared by every unit.
+
+    /**
+     * @brief Check whether hardware ADC calibration (adc_cali) is active
+     *
+     * @return true if adc_cali_raw_to_voltage() is being used; false if the
+     *         NVS-backed fallback linear calibration is in effect.
+     */
+    bool isHardwareCalibrationAvailable() const { return m_cali_available; }
+
+    /**
+     * @brief Set and persist the fallback linear calibration (gain + offset)
+     *
+     * Only used when hardware adc_cali is unavailable. Takes effect
+     * immediately and is stored in NVS so it survives reboots/re-flashes.
+     * Determine gain/offset by measuring known reference voltages and
+     * solving mv = raw * gain + offset for two points.
+     *
+     * @param gain_mv_per_count Millivolts per raw ADC count
+     * @param offset_mv Millivolt offset
+     * @return true if persisted to NVS successfully
+     */
+    bool setFallbackCalibration(float gain_mv_per_count, int32_t offset_mv);
+
+    /**
+     * @brief Get the fallback linear calibration currently in effect
+     */
+    void getFallbackCalibration(float& gain_mv_per_count, int32_t& offset_mv) const {
+        gain_mv_per_count = m_fallback_gain_mv_per_count;
+        offset_mv = m_fallback_offset_mv;
+    }
+
 private:
     // ============================================================
     // Private Constructor
@@ -371,11 +413,25 @@ private:
 
     /**
      * @brief Initialize ADC calibration
+     *
+     * Tries the ESP-IDF adc_cali scheme (curve/line fitting). All configured
+     * channels share the same ADC unit (ADC_UNIT_1) and the same attenuation
+     * (PowerMeterConfig::ADC_ATTENUATION), so a single m_cali_handle is valid
+     * for every channel - adc_cali calibration in ESP-IDF is a function of
+     * (unit, atten, bitwidth) only, it does not depend on the channel number.
+     * A per-channel handle array is therefore unnecessary here.
+     *
+     * If adc_cali is unavailable on this SoC/eFuse combination, loads the
+     * NVS-backed fallback linear calibration instead (see loadFallbackCalibration()).
      */
     bool initCalibration();
 
     /**
      * @brief Convert raw ADC value to calibrated millivolts
+     *
+     * Uses adc_cali_raw_to_voltage() when hardware calibration is available
+     * (m_cali_available); otherwise applies the fallback linear calibration
+     * (m_fallback_gain_mv_per_count / m_fallback_offset_mv).
      */
     int IRAM_ATTR rawToMillivolts(uint16_t raw_value);
 
@@ -383,6 +439,29 @@ private:
      * @brief Apply channel-specific calibration multiplier
      */
     float applyChannelCalibration(int millivolts, uint8_t channel_idx);
+
+    /**
+     * @brief Load the fallback linear calibration from NVS (or defaults)
+     *
+     * Called from initCalibration() when adc_cali is unavailable.
+     */
+    void loadFallbackCalibration();
+
+    /**
+     * @brief Local volts-per-raw-count scale factor around a channel's DC offset
+     *
+     * Uses whichever calibration path is active (adc_cali curve/line fitting,
+     * or the NVS fallback) via rawToMillivolts(), sampled at two points
+     * bracketing the channel's current DC offset and divided by their raw
+     * count difference. This gives a locally-linear conversion factor for
+     * turning an AC raw-count delta (as used in m_power_sum) into volts,
+     * consistent with whatever calibration produced the RMS voltage/current
+     * values - instead of reusing a separate hardcoded constant.
+     *
+     * @param channel_idx Config index of the channel
+     * @return Volts per raw ADC count
+     */
+    float rawCountsToVoltsScale(uint8_t channel_idx);
 
     // ============================================================
     // State Variables
@@ -399,6 +478,11 @@ private:
     adc_continuous_handle_t m_adc_handle;
     adc_cali_handle_t m_cali_handle;
 
+    // ADC calibration state
+    bool m_cali_available;                  ///< true if m_cali_handle / adc_cali_raw_to_voltage() is usable
+    float m_fallback_gain_mv_per_count;      ///< Fallback linear calibration: mV per raw ADC count (used only if !m_cali_available)
+    int32_t m_fallback_offset_mv;            ///< Fallback linear calibration: mV offset (used only if !m_cali_available)
+
     // Processing task
     TaskHandle_t m_task_handle;
 
@@ -408,6 +492,12 @@ private:
     // RMS accumulation (raw ADC values, integer math)
     uint64_t m_sum_squares[PowerMeterConfig::MAX_CHANNELS];  ///< Sum of squared AC components (raw ADC)
     uint16_t m_frame_count;
+
+    // Active (real) power accumulation (raw ADC values, integer math)
+    // Accumulates instantaneous v_ac_raw * i_ac_raw products per sample, so that
+    // averaging over the RMS window gives true active power P = mean(v(t)*i(t)),
+    // automatically accounting for phase shift and power factor.
+    int64_t m_power_sum[PowerMeterConfig::MAX_CHANNELS];     ///< Sum of v_ac*i_ac products (raw ADC, current channels only)
 
     // Phase analysis accumulators (raw ADC values)
     int64_t m_positive_sum[PowerMeterConfig::MAX_CHANNELS];  ///< Sum of positive AC components (raw ADC)
@@ -422,6 +512,17 @@ private:
 
     // Voltage AC component cache for phase correlation
     int32_t m_voltage_ac;  ///< Current voltage AC component (updated each sample)
+
+    // Inter-channel phase alignment
+    // On a single-ADC1 setup (ADC2 unusable while WiFi is active), all channels
+    // share one SAR ADC and are scanned sequentially within each round-robin
+    // cycle, so each channel's sample lags/leads the voltage sample by a fixed
+    // fractional sample period. These fields correct for it via linear
+    // extrapolation before phase/power accumulation (see begin() and processFrame()).
+    uint8_t m_scan_position[PowerMeterConfig::MAX_CHANNELS];  ///< Position of each channel within the ADC round-robin scan order (ascending channel number)
+    int8_t m_voltage_config_idx;                              ///< Config index of the voltage channel (-1 if none found)
+    float m_phase_align_frac[PowerMeterConfig::MAX_CHANNELS]; ///< Per-channel extrapolation fraction to align a sample with the voltage sample's time
+    int32_t m_prev_ac[PowerMeterConfig::MAX_CHANNELS];        ///< Previous raw AC component per channel (delay-line for interpolation)
 
     // Results
     Measurements m_measurements;
