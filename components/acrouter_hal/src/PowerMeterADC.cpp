@@ -44,6 +44,9 @@ PowerMeterADC::PowerMeterADC() :
     m_initialized(false),
     m_adc_handle(nullptr),
     m_cali_handle(nullptr),
+    m_cali_available(false),
+    m_fallback_gain_mv_per_count(2376.0f / 4095.0f),  // legacy empirical default, overridden by NVS if saved
+    m_fallback_offset_mv(0),
     m_task_handle(nullptr),
     m_frame_count(0),
     m_results_callback(nullptr),
@@ -55,6 +58,7 @@ PowerMeterADC::PowerMeterADC() :
 {
     // Initialize accumulators
     memset(m_sum_squares, 0, sizeof(m_sum_squares));
+    memset(m_power_sum, 0, sizeof(m_power_sum));
     memset(m_positive_sum, 0, sizeof(m_positive_sum));
     memset(m_negative_sum, 0, sizeof(m_negative_sum));
     memset(m_dc_sum, 0, sizeof(m_dc_sum));
@@ -63,6 +67,11 @@ PowerMeterADC::PowerMeterADC() :
     memset(m_phase_same, 0, sizeof(m_phase_same));
     memset(m_phase_diff, 0, sizeof(m_phase_diff));
     m_voltage_ac = 0;
+
+    memset(m_scan_position, 0, sizeof(m_scan_position));
+    m_voltage_config_idx = -1;
+    memset(m_phase_align_frac, 0, sizeof(m_phase_align_frac));
+    memset(m_prev_ac, 0, sizeof(m_prev_ac));
 
     // Create mutex for measurements
     m_measurements_mutex = xSemaphoreCreateMutex();
@@ -133,6 +142,43 @@ bool PowerMeterADC::begin(const ADCChannelConfig* configs, uint8_t channel_count
     if (m_channel_count == 0) {
         ESP_LOGE(TAG, "No valid enabled ADC channels found!");
         return false;
+    }
+
+    // === Compute inter-channel phase alignment ===
+    // ADC1 hardware scans configured channels in ascending channel-number order
+    // within each round-robin cycle (see processFrame() buffer-format note), so
+    // every channel is sampled at a fixed sub-period offset relative to the
+    // voltage channel. Precompute each channel's scan position and the linear
+    // extrapolation fraction needed to align its samples with the voltage
+    // sample's time (used in processFrame()).
+    for (uint8_t i = 0; i < m_channel_count; i++) {
+        uint8_t rank = 0;
+        for (uint8_t j = 0; j < m_channel_count; j++) {
+            if (m_adc_channels[j] < m_adc_channels[i] ||
+                (m_adc_channels[j] == m_adc_channels[i] && j < i)) {
+                rank++;
+            }
+        }
+        m_scan_position[i] = rank;
+    }
+
+    m_voltage_config_idx = -1;
+    for (uint8_t i = 0; i < m_channel_count; i++) {
+        if (isVoltageSensor(m_channel_configs[i].type)) {
+            m_voltage_config_idx = static_cast<int8_t>(i);
+            break;
+        }
+    }
+
+    if (m_voltage_config_idx >= 0) {
+        for (uint8_t i = 0; i < m_channel_count; i++) {
+            m_phase_align_frac[i] = static_cast<float>(
+                m_scan_position[m_voltage_config_idx] - m_scan_position[i]) / m_channel_count;
+            ESP_LOGI(TAG, "Channel %d: scan_pos=%d, phase_align_frac=%.3f",
+                     i, m_scan_position[i], m_phase_align_frac[i]);
+        }
+    } else {
+        ESP_LOGW(TAG, "No voltage channel found, phase alignment disabled");
     }
 
     // Create ADC continuous handle
@@ -231,6 +277,7 @@ bool PowerMeterADC::start() {
     m_frames_dropped = 0;
     m_frame_count = 0;
     memset(m_sum_squares, 0, sizeof(m_sum_squares));
+    memset(m_power_sum, 0, sizeof(m_power_sum));
 
     // Start ADC DMA
     esp_err_t ret = adc_continuous_start(m_adc_handle);
@@ -291,6 +338,7 @@ void PowerMeterADC::deinit() {
 #endif
         m_cali_handle = nullptr;
     }
+    m_cali_available = false;
 
     m_initialized = false;
     ESP_LOGI(TAG, "Deinitialized");
@@ -312,7 +360,8 @@ bool PowerMeterADC::initCalibration() {
 
     ret = adc_cali_create_scheme_curve_fitting(&cali_config, &m_cali_handle);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "ADC calibration: curve fitting");
+        ESP_LOGI(TAG, "ADC calibration: curve fitting (adc_cali_raw_to_voltage active)");
+        m_cali_available = true;
         return true;
     }
 #elif ADC_CALI_SCHEME_LINE_FITTING_SUPPORTED
@@ -324,21 +373,85 @@ bool PowerMeterADC::initCalibration() {
 
     ret = adc_cali_create_scheme_line_fitting(&cali_config, &m_cali_handle);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "ADC calibration: line fitting");
+        ESP_LOGI(TAG, "ADC calibration: line fitting (adc_cali_raw_to_voltage active)");
+        m_cali_available = true;
         return true;
     }
 #endif
 
-    ESP_LOGW(TAG, "ADC calibration not supported");
+    ESP_LOGW(TAG, "ADC calibration (adc_cali) not supported on this SoC/eFuse combo, "
+                  "using NVS-backed fallback linear calibration instead");
+    m_cali_available = false;
+    m_cali_handle = nullptr;
+    loadFallbackCalibration();
     return false;
 }
 
+void PowerMeterADC::loadFallbackCalibration() {
+    // Default to the old hardcoded empirical constant if nothing was ever saved,
+    // so behavior is unchanged for units that haven't been calibrated yet.
+    float default_gain = 2376.0f / 4095.0f;
+    int32_t default_offset = 0;
+
+    Preferences prefs;
+    if (prefs.begin("pwrmeter_cal", /*readOnly=*/true)) {
+        m_fallback_gain_mv_per_count = prefs.getFloat("gain_mv", default_gain);
+        m_fallback_offset_mv = prefs.getInt("offset_mv", default_offset);
+        prefs.end();
+        ESP_LOGI(TAG, "Fallback calibration loaded from NVS: gain=%.5f mV/count, offset=%ld mV",
+                 m_fallback_gain_mv_per_count, static_cast<long>(m_fallback_offset_mv));
+    } else {
+        m_fallback_gain_mv_per_count = default_gain;
+        m_fallback_offset_mv = default_offset;
+        ESP_LOGW(TAG, "No saved fallback calibration in NVS, using default gain=%.5f mV/count",
+                 m_fallback_gain_mv_per_count);
+    }
+}
+
+bool PowerMeterADC::setFallbackCalibration(float gain_mv_per_count, int32_t offset_mv) {
+    Preferences prefs;
+    if (!prefs.begin("pwrmeter_cal", /*readOnly=*/false)) {
+        ESP_LOGE(TAG, "Failed to open NVS namespace 'pwrmeter_cal' for writing");
+        return false;
+    }
+
+    bool ok = prefs.putFloat("gain_mv", gain_mv_per_count) > 0 &&
+              prefs.putInt("offset_mv", offset_mv) > 0;
+    prefs.end();
+
+    if (!ok) {
+        ESP_LOGE(TAG, "Failed to persist fallback calibration to NVS");
+        return false;
+    }
+
+    m_fallback_gain_mv_per_count = gain_mv_per_count;
+    m_fallback_offset_mv = offset_mv;
+    ESP_LOGI(TAG, "Fallback calibration saved: gain=%.5f mV/count, offset=%ld mV",
+             gain_mv_per_count, static_cast<long>(offset_mv));
+    return true;
+}
+
 int IRAM_ATTR PowerMeterADC::rawToMillivolts(uint16_t raw_value) {
-    // Linear conversion: 12-bit ADC (0-4095) → millivolts
-    // IMPORTANT: Calibrated for actual ESP32 power supply voltage (~2.85V) and sensor power (3.26V)
-    // Calibration factor determined empirically: 0.247V measured vs 0.343V calculated = 0.720 correction
-    // Effective reference voltage: 3300mV * 0.720 = 2376mV
-    return (raw_value * 2376) / 4095;
+    // Prefer the ESP-IDF adc_cali API: it uses the SoC's factory eFuse
+    // reference curve, so it's accurate per physical chip (unlike a single
+    // hardcoded constant shared by every unit). Not a true ISR - this is only
+    // ever called from calculateAndPublishRMS()/logDebugInfo() in task
+    // context (once per 200ms RMS window, not per sample), so the flash-call
+    // cost of adc_cali_raw_to_voltage() is fine here.
+    if (m_cali_available && m_cali_handle != nullptr) {
+        int voltage_mv = 0;
+        esp_err_t ret = adc_cali_raw_to_voltage(m_cali_handle, raw_value, &voltage_mv);
+        if (ret == ESP_OK) {
+            return voltage_mv;
+        }
+        ESP_LOGW(TAG, "adc_cali_raw_to_voltage failed (%s), using fallback calibration",
+                 esp_err_to_name(ret));
+    }
+
+    // Fallback: adc_cali unavailable (or failed at runtime). Use a per-device
+    // linear calibration (gain + offset) loaded from NVS in loadFallbackCalibration(),
+    // instead of the old single hardcoded empirical constant.
+    return static_cast<int>(raw_value * m_fallback_gain_mv_per_count) + m_fallback_offset_mv;
 }
 
 float PowerMeterADC::applyChannelCalibration(int millivolts, uint8_t channel_idx) {
@@ -349,6 +462,32 @@ float PowerMeterADC::applyChannelCalibration(int millivolts, uint8_t channel_idx
     // Convert mV to V, then apply sensor-specific multiplier
     float volts = millivolts / 1000.0f;
     return volts * m_channel_configs[channel_idx].multiplier;
+}
+
+float PowerMeterADC::rawCountsToVoltsScale(uint8_t channel_idx) {
+    if (channel_idx >= m_channel_count) {
+        return 0.0f;
+    }
+
+    int32_t dc_offset = (m_sample_count[channel_idx] > 0) ?
+        static_cast<int32_t>(m_dc_sum[channel_idx] / m_sample_count[channel_idx]) : 2048;
+
+    constexpr int32_t DELTA = 200;  // raw counts; small enough to stay locally linear
+    int32_t lo = dc_offset - DELTA;
+    int32_t hi = dc_offset + DELTA;
+    if (lo < 0) lo = 0;
+    if (hi > 4095) hi = 4095;
+
+    if (hi <= lo) {
+        // Degenerate range (DC offset pinned at a rail) - fall back to the
+        // fallback gain as a reasonable estimate rather than dividing by zero.
+        return m_fallback_gain_mv_per_count / 1000.0f;
+    }
+
+    int mv_lo = rawToMillivolts(static_cast<uint16_t>(lo));
+    int mv_hi = rawToMillivolts(static_cast<uint16_t>(hi));
+
+    return static_cast<float>(mv_hi - mv_lo) / (hi - lo) / 1000.0f;  // volts per raw count
 }
 
 // ============================================================
@@ -524,17 +663,38 @@ void IRAM_ATTR PowerMeterADC::processFrame(uint8_t* buffer, uint32_t size) {
                     // Save voltage AC component for comparison with current channels
                     m_voltage_ac = ac_component;
                 } else if (isCurrentSensor(m_channel_configs[config_idx].type)) {
+                    // Align this current sample with the voltage sample's actual
+                    // time. Since all channels share one SAR ADC (ADC1) and are
+                    // scanned sequentially, this channel's sample is offset from
+                    // the voltage sample by a fixed fraction of one sample period.
+                    // Linear extrapolation using the previous sample of this same
+                    // channel corrects for it (m_phase_align_frac computed once
+                    // in begin()); the offset is always < 1 sample period, so this
+                    // is a small, well-conditioned correction, not a large lag.
+                    int32_t aligned_ac = ac_component +
+                        static_cast<int32_t>((ac_component - m_prev_ac[config_idx]) *
+                                              m_phase_align_frac[config_idx]);
+                    m_prev_ac[config_idx] = ac_component;
+
                     // Compare current phase with voltage phase
                     // Same sign = in phase = CONSUMING
                     // Different sign = out of phase = SUPPLYING
                     bool voltage_positive = (m_voltage_ac > 0);
-                    bool current_positive = (ac_component > 0);
+                    bool current_positive = (aligned_ac > 0);
 
                     if (voltage_positive == current_positive) {
                         m_phase_same[config_idx]++;   // Same sign → CONSUMING
                     } else {
                         m_phase_diff[config_idx]++;   // Different sign → SUPPLYING
                     }
+
+                    // Accumulate instantaneous power: v_ac(t) * i_ac(t), using the
+                    // phase-aligned current sample so the product corresponds to
+                    // the same instant in time as the voltage sample.
+                    // Averaging this product over the RMS window gives true active
+                    // power P = mean(v(t)*i(t)), which automatically accounts for
+                    // phase shift and power factor (unlike Vrms * Irms).
+                    m_power_sum[config_idx] += static_cast<int64_t>(m_voltage_ac) * aligned_ac;
                 }
             } else {
                 // Unknown channel - log occasionally
@@ -781,36 +941,47 @@ void PowerMeterADC::calculateAndPublishRMS() {
                 continue;  // Skip unknown sensor types
             }
 
-            float voltage_rms = new_measurements.voltage_rms;
             float current_rms = new_measurements.current_rms[current_idx];
 
-            // Simple power calculation (assumes unity power factor for direction)
-            float apparent_power = voltage_rms * current_rms;
+            // === TRUE ACTIVE POWER: P = mean(v(t) * i(t)) ===
+            // m_power_sum holds the sum of instantaneous v_ac_raw * i_ac_raw products
+            // (raw ADC counts) accumulated sample-by-sample in processFrame().
+            // Averaging it over the RMS window and converting both factors from raw
+            // ADC counts to physical units gives the real active power directly,
+            // automatically accounting for phase shift and power factor - unlike
+            // apparent_power = Vrms * Irms, which assumes unity PF and ignores phase.
+            //
+            // The raw-count -> volts scale for each channel comes from
+            // rawCountsToVoltsScale(), which goes through the same calibration
+            // path (adc_cali curve/line fitting, or the NVS fallback) as the
+            // RMS voltage/current above - not a separate hardcoded constant.
+            double mean_raw_power = static_cast<double>(m_power_sum[ch]) /
+                                     PowerMeterConfig::RMS_SAMPLES_PER_CHANNEL;
+            float volts_per_count_voltage = rawCountsToVoltsScale(voltage_ch_idx);
+            float volts_per_count_current = rawCountsToVoltsScale(ch);
+            float voltage_multiplier = m_channel_configs[voltage_ch_idx].multiplier;
+            float current_multiplier = m_channel_configs[ch].multiplier;
+            float active_power = static_cast<float>(
+                mean_raw_power * volts_per_count_voltage * volts_per_count_current *
+                voltage_multiplier * current_multiplier);
 
-            // Determine direction based on phase correlation
-            // m_phase_same[ch]: count of samples where V and I have same sign (in phase)
-            // m_phase_diff[ch]: count of samples where V and I have different sign (out of phase)
-            uint32_t same_count = m_phase_same[ch];
-            uint32_t diff_count = m_phase_diff[ch];
-            uint32_t total_count = same_count + diff_count;
-
-            if (total_count == 0 || current_rms < 0.1f) {
-                // No data or negligible current
+            if (current_rms < 0.1f) {
+                // Negligible current
                 new_measurements.direction[current_idx] = CurrentDirection::ZERO;
                 new_measurements.power_active[current_idx] = 0.0f;
 
-            } else if (same_count > diff_count) {
-                // More in-phase samples → CONSUMING (current flows into load)
+            } else if (active_power > 0.0f) {
+                // Positive active power → CONSUMING (current flows into load)
                 new_measurements.direction[current_idx] = CurrentDirection::CONSUMING;
-                new_measurements.power_active[current_idx] = apparent_power;
+                new_measurements.power_active[current_idx] = active_power;
 
-            } else if (diff_count > same_count) {
-                // More out-of-phase samples → SUPPLYING (current flows to grid)
+            } else if (active_power < 0.0f) {
+                // Negative active power → SUPPLYING (current flows to grid)
                 new_measurements.direction[current_idx] = CurrentDirection::SUPPLYING;
-                new_measurements.power_active[current_idx] = -apparent_power;
+                new_measurements.power_active[current_idx] = active_power;
 
             } else {
-                // Equal - undefined direction
+                // Exactly zero - undefined direction
                 new_measurements.direction[current_idx] = CurrentDirection::ZERO;
                 new_measurements.power_active[current_idx] = 0.0f;
             }
@@ -857,6 +1028,7 @@ void PowerMeterADC::calculateAndPublishRMS() {
 
     // Reset accumulators
     memset(m_sum_squares, 0, sizeof(m_sum_squares));
+    memset(m_power_sum, 0, sizeof(m_power_sum));
     memset(m_positive_sum, 0, sizeof(m_positive_sum));
     memset(m_negative_sum, 0, sizeof(m_negative_sum));
     memset(m_dc_sum, 0, sizeof(m_dc_sum));
