@@ -69,6 +69,13 @@ const char DASHBOARD_STYLES[] PROGMEM = R"rawliteral(
     font-weight: 500;
 }
 
+.power-voltage {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-top: calc(-1 * var(--spacing-sm));
+    margin-bottom: var(--spacing-sm);
+}
+
 .power-icon {
     font-size: 2rem;
     margin-bottom: var(--spacing-sm);
@@ -381,6 +388,7 @@ const char DASHBOARD_CONTENT[] PROGMEM = R"rawliteral(
             <span id="power-grid">--</span>
             <span class="power-unit">W</span>
         </div>
+        <div class="power-voltage"><span id="voltage-grid">--</span> V</div>
         <div id="grid-direction" class="form-helper"></div>
     </div>
 
@@ -595,6 +603,12 @@ function updateModeUI(mode) {
 async function loadMetrics() {
     const data = await apiGet('metrics');
     if (!data) return;
+
+    // Mains voltage - shown only on the Grid Power card, since
+    // grid/solar/load all share the same single AC line measurement
+    const voltage = data.metrics.voltage;
+    document.getElementById('voltage-grid').textContent =
+        (voltage || voltage === 0) ? voltage.toFixed(1) : '--';
 
     // Update Grid Power
     const gridPower = data.metrics.power_grid;
