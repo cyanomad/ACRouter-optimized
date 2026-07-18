@@ -19,8 +19,7 @@ DimmerHAL& DimmerHAL::getInstance() {
 
 // Private constructor
 DimmerHAL::DimmerHAL() :
-    m_initialized(false),
-    m_default_curve(DimmerCurve::RMS)
+    m_initialized(false)
 {
     // Initialize channel pointers to NULL
     for (uint8_t i = 0; i < DimmerConfig::MAX_CHANNELS; i++) {
@@ -29,15 +28,13 @@ DimmerHAL::DimmerHAL() :
     }
 }
 
-bool DimmerHAL::begin(DimmerCurve curve) {
+bool DimmerHAL::begin() {
     if (m_initialized) {
         ESP_LOGI(TAG, "Already initialized");
         return true;
     }
 
     ESP_LOGI(TAG, "Initializing dimmer control system...");
-
-    m_default_curve = curve;
 
     // Step 1: Initialize RBDimmer library
     rbdimmer_err_t err = rbdimmer_init();
@@ -70,8 +67,7 @@ bool DimmerHAL::begin(DimmerCurve curve) {
         rbdimmer_config_t config = {
             .gpio_pin = gpio_pin,
             .phase = DimmerConfig::PHASE_NUM,
-            .initial_level = DimmerConfig::DEFAULT_POWER_PERCENT,
-            .curve_type = static_cast<rbdimmer_curve_t>(curve)
+            .initial_level = DimmerConfig::DEFAULT_POWER_PERCENT
         };
 
         // Create channel
@@ -94,7 +90,6 @@ bool DimmerHAL::begin(DimmerCurve curve) {
         m_status[i].active = false;
         m_status[i].power_percent = DimmerConfig::DEFAULT_POWER_PERCENT;
         m_status[i].target_percent = DimmerConfig::DEFAULT_POWER_PERCENT;
-        m_status[i].curve = curve;
 
         ESP_LOGI(TAG, "Channel %d created successfully", i);
     }
@@ -244,44 +239,6 @@ bool DimmerHAL::allOff() {
     }
 
     return all_success;
-}
-
-bool DimmerHAL::setCurve(DimmerChannel channel, DimmerCurve curve) {
-    if (!m_initialized) {
-        ESP_LOGE(TAG, "Not initialized");
-        return false;
-    }
-
-    if (!isValidChannel(channel)) {
-        ESP_LOGE(TAG, "Invalid channel %d", static_cast<uint8_t>(channel));
-        return false;
-    }
-
-    uint8_t ch_idx = static_cast<uint8_t>(channel);
-
-    // Set curve type
-    rbdimmer_err_t err = rbdimmer_set_curve(
-        m_channels[ch_idx],
-        static_cast<rbdimmer_curve_t>(curve)
-    );
-    if (err != RBDIMMER_OK) {
-        ESP_LOGE(TAG, "Failed to set curve on channel %d (error: %d)", ch_idx, err);
-        return false;
-    }
-
-    // Update status
-    m_status[ch_idx].curve = curve;
-
-    const char* curve_name = "Unknown";
-    switch (curve) {
-        case DimmerCurve::LINEAR:      curve_name = "Linear"; break;
-        case DimmerCurve::RMS:         curve_name = "RMS"; break;
-        case DimmerCurve::LOGARITHMIC: curve_name = "Logarithmic"; break;
-    }
-
-    ESP_LOGI(TAG, "Channel %d curve set to %s", ch_idx, curve_name);
-
-    return true;
 }
 
 bool DimmerHAL::isValidChannel(DimmerChannel channel) const {
