@@ -454,7 +454,7 @@ const char DASHBOARD_CONTENT[] PROGMEM = R"rawliteral(
             <input
                 type="range"
                 min="0"
-                max="100"
+                max="10000"
                 value="0"
                 class="dimmer-slider"
                 id="dimmer-slider"
