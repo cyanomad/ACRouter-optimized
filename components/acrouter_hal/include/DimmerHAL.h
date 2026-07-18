@@ -40,9 +40,9 @@ namespace DimmerConfig {
     constexpr uint8_t MAX_CHANNELS = 2;                 // Two dimmer outputs
 
     // Power Limits (percent)
-    constexpr uint8_t MIN_POWER_PERCENT = 0;            // Minimum power level
-    constexpr uint8_t MAX_POWER_PERCENT = 100;          // Maximum power level
-    constexpr uint8_t DEFAULT_POWER_PERCENT = 0;        // Start with dimmers off
+    constexpr uint16_t MIN_POWER_PERCENT = 0;            // Minimum power level
+    constexpr uint16_t MAX_POWER_PERCENT = 10000;          // Maximum power level
+    constexpr uint16_t DEFAULT_POWER_PERCENT = 0;        // Start with dimmers off
 
     // Transition Defaults
     constexpr uint32_t DEFAULT_TRANSITION_MS = 500;     // Default smooth transition time
@@ -75,8 +75,8 @@ enum class DimmerCurve : uint8_t {
 struct DimmerStatus {
     bool initialized;           ///< True if dimmer is initialized
     bool active;                ///< True if dimmer is actively controlling output
-    uint8_t power_percent;      ///< Current power level (0-100%)
-    uint8_t target_percent;     ///< Target power level during transition
+    uint16_t power_percent;      ///< Current power level (0-100%)
+    uint16_t target_percent;     ///< Target power level during transition
     DimmerCurve curve;          ///< Current power curve type
 
     DimmerStatus() :
@@ -146,7 +146,7 @@ public:
      * @param power_percent Power level in percent (0-100)
      * @return true if successful, false otherwise
      */
-    bool setPower(DimmerChannel channel, uint8_t power_percent);
+    bool setPower(DimmerChannel channel, uint16_t power_percent);
 
     /**
      * @brief Set power level with smooth transition
@@ -159,7 +159,7 @@ public:
      * @param transition_ms Transition duration in milliseconds
      * @return true if successful, false otherwise
      */
-    bool setPowerSmooth(DimmerChannel channel, uint8_t power_percent,
+    bool setPowerSmooth(DimmerChannel channel, uint16_t power_percent,
                         uint32_t transition_ms = DimmerConfig::DEFAULT_TRANSITION_MS);
 
     /**
@@ -168,7 +168,7 @@ public:
      * @param channel Dimmer channel to query
      * @return Current power level in percent (0-100), or 0 if channel invalid
      */
-    uint8_t getPower(DimmerChannel channel) const;
+    uint16_t getPower(DimmerChannel channel) const;
 
     /**
      * @brief Get detailed status for a channel
@@ -233,7 +233,7 @@ private:
      * @param power_percent Input power value
      * @return Clamped value (0-100)
      */
-    uint8_t clampPower(uint8_t power_percent) const;
+    uint16_t clampPower(uint16_t power_percent) const;
 
     // RBDimmer channel handles
     rbdimmer_channel_t* m_channels[DimmerConfig::MAX_CHANNELS];
