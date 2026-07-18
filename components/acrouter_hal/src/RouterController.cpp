@@ -316,7 +316,7 @@ void RouterController::applyDimmerLevel(float level) {
     m_target_level = level;
 
     // Convert to integer percent
-    uint8_t percent = static_cast<uint8_t>(level + 0.5f);  // Round
+    uint16_t percent = static_cast<uint16_t>(level + 0.5f);  // Round
 
     // Apply to dimmer if changed
     if (percent != m_status.dimmer_percent) {
@@ -379,9 +379,9 @@ void RouterController::setMode(RouterMode mode) {
     }
 }
 
-void RouterController::setManualLevel(uint8_t percent) {
-    if (percent > 100) {
-        percent = 100;
+void RouterController::setManualLevel(uint16_t percent) {
+    if (percent > 9800) {
+        percent = 9800;
     }
     m_manual_level = percent;
 
