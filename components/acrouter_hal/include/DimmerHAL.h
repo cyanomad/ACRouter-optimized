@@ -61,15 +61,6 @@ enum class DimmerChannel : uint8_t {
 };
 
 /**
- * @brief Dimmer power curve types
- */
-enum class DimmerCurve : uint8_t {
-    LINEAR = RBDIMMER_CURVE_LINEAR,         ///< Linear power curve
-    RMS = RBDIMMER_CURVE_RMS,               ///< RMS-compensated (recommended for resistive loads)
-    LOGARITHMIC = RBDIMMER_CURVE_LOGARITHMIC ///< Logarithmic (recommended for LED loads)
-};
-
-/**
  * @brief Dimmer channel status information
  */
 struct DimmerStatus {
