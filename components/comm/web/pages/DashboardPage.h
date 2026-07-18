@@ -777,7 +777,7 @@ function updateStateIndicator(state) {
 // Manual Dimmer Control
 // ============================================================
 function updateDimmerDisplay(value) {
-    document.getElementById('dimmer-slider-value').textContent = value;
+    document.getElementById('dimmer-slider-value').textContent = value / 100;
 }
 
 async function setDimmer(value) {
