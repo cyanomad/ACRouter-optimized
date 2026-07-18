@@ -31,7 +31,7 @@ const char DASHBOARD_STYLES[] PROGMEM = R"rawliteral(
     transform: translateY(-4px);
 }
 
-.power-metric.grid {
+.power-metric.grid_ {
     background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
 }
 
@@ -72,8 +72,7 @@ const char DASHBOARD_STYLES[] PROGMEM = R"rawliteral(
 .power-voltage {
     font-size: 0.875rem;
     color: var(--text-secondary);
-    margin-top: calc(-1 * var(--spacing-sm));
-    margin-bottom: var(--spacing-sm);
+    margin-top: calc(4 * var(--spacing-sm));
 }
 
 .power-icon {
@@ -381,15 +380,15 @@ const char DASHBOARD_CONTENT[] PROGMEM = R"rawliteral(
 </div>
 <div id="power-grid-container" class="grid grid-3 mb-lg">
     <!-- Grid Power -->
-    <div class="card power-metric grid">
+    <div class="card power-metric grid_" id="grid-card">
         <div class="power-icon">⚡</div>
         <div class="power-label">Grid Power</div>
         <div class="power-value">
+            <span class="power-unit">&nbsp;&nbsp;&nbsp;</span>
             <span id="power-grid">--</span>
             <span class="power-unit">W</span>
         </div>
-        <div class="power-voltage"><span id="voltage-grid">--</span> V</div>
-        <div id="grid-direction" class="form-helper"></div>
+        <div class="card power-voltage"><span id="voltage-grid">--</span> V</div>
     </div>
 
     <!-- Solar Power -->
@@ -397,6 +396,7 @@ const char DASHBOARD_CONTENT[] PROGMEM = R"rawliteral(
         <div class="power-icon">☀️</div>
         <div class="power-label">Solar Power</div>
         <div class="power-value">
+            <span class="power-unit">&nbsp;&nbsp;&nbsp;</span>
             <span id="power-solar">--</span>
             <span class="power-unit">W</span>
         </div>
@@ -407,10 +407,14 @@ const char DASHBOARD_CONTENT[] PROGMEM = R"rawliteral(
         <div class="power-icon">🔌</div>
         <div class="power-label">Load Power</div>
         <div class="power-value">
+            <span class="power-unit">&nbsp;&nbsp;&nbsp;</span>
             <span id="power-load">--</span>
             <span class="power-unit">W</span>
         </div>
     </div>
+</div>
+<div id="power-grid-container" class="grid mb-lg">
+    <div id="grid-direction" class="form-helper" style="text-align: center;"></div>
 </div>
 
 <!-- Block 2: Load Devices (shown in AUTO/ECO/OFFGRID/BOOST modes) -->
@@ -619,10 +623,10 @@ async function loadMetrics() {
     gridDir.className = ''; // Clear classes
 
     if (gridPower > 10) {
-        gridDir.textContent = '← Importing from grid';
+        gridDir.textContent = '⮞ Importing from grid';
         gridDir.classList.add('importing');
     } else if (gridPower < -10) {
-        gridDir.textContent = '→ Exporting to grid';
+        gridDir.textContent = '⮜ Exporting to grid';
         gridDir.classList.add('exporting');
     } else {
         gridDir.textContent = '⚖ Balanced';
@@ -654,7 +658,7 @@ async function loadMetrics() {
             // Also update manual slider if in manual mode
             if (currentMode === 'manual' && dimmer.id === 1) {
                 document.getElementById('dimmer-slider').value = dimmer.level;
-                document.getElementById('dimmer-slider-value').textContent = dimmer.level;
+                document.getElementById('dimmer-slider-value').textContent = (dimmer.level >= 9800 ? 10000 : dimmer.level) / 100;
             }
         });
     }
@@ -777,7 +781,7 @@ function updateStateIndicator(state) {
 // Manual Dimmer Control
 // ============================================================
 function updateDimmerDisplay(value) {
-    document.getElementById('dimmer-slider-value').textContent = value / 100;
+    document.getElementById('dimmer-slider-value').textContent = (value >= 9800 ? 10000 : value) / 100;
 }
 
 async function setDimmer(value) {
