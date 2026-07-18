@@ -365,9 +365,9 @@ void WebServerManager::handleSetDimmer() {
         return;
     }
 
-    uint8_t value = doc["value"];
-    if (value > 100) {
-        sendError(400, "Value must be 0-100");
+    uint16_t value = doc["value"];
+    if (value > 10000) {
+        sendError(400, "Value must be 0-10000");
         return;
     }
 
@@ -413,9 +413,9 @@ void WebServerManager::handleSetManual() {
         return;
     }
 
-    uint8_t value = doc["value"];
-    if (value > 100) {
-        sendError(400, "Value must be 0-100");
+    uint16_t value = doc["value"];
+    if (value > 10000) {
+        sendError(400, "Value must be 0-10000");
         return;
     }
 
