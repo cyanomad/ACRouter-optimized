@@ -116,7 +116,7 @@ bool DimmerHAL::begin(DimmerCurve curve) {
     return true;
 }
 
-bool DimmerHAL::setPower(DimmerChannel channel, uint8_t power_percent) {
+bool DimmerHAL::setPower(DimmerChannel channel, uint16_t power_percent) {
     if (!m_initialized) {
         ESP_LOGE(TAG, "Not initialized");
         return false;
@@ -128,7 +128,7 @@ bool DimmerHAL::setPower(DimmerChannel channel, uint8_t power_percent) {
     }
 
     uint8_t ch_idx = static_cast<uint8_t>(channel);
-    uint8_t clamped_power = clampPower(power_percent);
+    uint16_t clamped_power = clampPower(power_percent);
 
     // Set power level
     rbdimmer_err_t err = rbdimmer_set_level(m_channels[ch_idx], clamped_power);
@@ -147,7 +147,7 @@ bool DimmerHAL::setPower(DimmerChannel channel, uint8_t power_percent) {
     return true;
 }
 
-bool DimmerHAL::setPowerSmooth(DimmerChannel channel, uint8_t power_percent, uint32_t transition_ms) {
+bool DimmerHAL::setPowerSmooth(DimmerChannel channel, uint16_t power_percent, uint32_t transition_ms) {
     if (!m_initialized) {
         ESP_LOGE(TAG, "Not initialized");
         return false;
@@ -159,7 +159,7 @@ bool DimmerHAL::setPowerSmooth(DimmerChannel channel, uint8_t power_percent, uin
     }
 
     uint8_t ch_idx = static_cast<uint8_t>(channel);
-    uint8_t clamped_power = clampPower(power_percent);
+    uint16_t clamped_power = clampPower(power_percent);
 
     // Clamp transition time
     if (transition_ms > DimmerConfig::MAX_TRANSITION_MS) {
@@ -187,7 +187,7 @@ bool DimmerHAL::setPowerSmooth(DimmerChannel channel, uint8_t power_percent, uin
     return true;
 }
 
-uint8_t DimmerHAL::getPower(DimmerChannel channel) const {
+uint16_t DimmerHAL::getPower(DimmerChannel channel) const {
     if (!m_initialized || !isValidChannel(channel)) {
         return 0;
     }
@@ -288,7 +288,7 @@ bool DimmerHAL::isValidChannel(DimmerChannel channel) const {
     return static_cast<uint8_t>(channel) < DimmerConfig::MAX_CHANNELS;
 }
 
-uint8_t DimmerHAL::clampPower(uint8_t power_percent) const {
+uint16_t DimmerHAL::clampPower(uint16_t power_percent) const {
     if (power_percent < DimmerConfig::MIN_POWER_PERCENT) {
         return DimmerConfig::MIN_POWER_PERCENT;
     }
