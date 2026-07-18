@@ -68,14 +68,12 @@ struct DimmerStatus {
     bool active;                ///< True if dimmer is actively controlling output
     uint16_t power_percent;      ///< Current power level (0-100%)
     uint16_t target_percent;     ///< Target power level during transition
-    DimmerCurve curve;          ///< Current power curve type
 
     DimmerStatus() :
         initialized(false),
         active(false),
         power_percent(0),
-        target_percent(0),
-        curve(DimmerCurve::RMS)
+        target_percent(0)
     {}
 };
 
@@ -125,7 +123,7 @@ public:
      * @param curve Power curve type to use (default: RMS for resistive loads)
      * @return true if initialization successful, false otherwise
      */
-    bool begin(DimmerCurve curve = DimmerCurve::RMS);
+    bool begin();
 
     /**
      * @brief Set immediate power level for a channel
@@ -193,18 +191,6 @@ public:
      */
     bool allOff();
 
-    /**
-     * @brief Change power curve type for a channel
-     *
-     * Switches between Linear, RMS, and Logarithmic curves.
-     * Use RMS for incandescent/resistive loads, Logarithmic for LEDs.
-     *
-     * @param channel Dimmer channel to configure
-     * @param curve New curve type
-     * @return true if successful, false otherwise
-     */
-    bool setCurve(DimmerChannel channel, DimmerCurve curve);
-
 private:
     // Singleton: Private constructor and deleted copy operations
     DimmerHAL();
@@ -232,7 +218,6 @@ private:
     // Status tracking
     DimmerStatus m_status[DimmerConfig::MAX_CHANNELS];
     bool m_initialized;
-    DimmerCurve m_default_curve;
 
     // GPIO pin mapping
     static constexpr uint8_t CHANNEL_PINS[DimmerConfig::MAX_CHANNELS] = {
