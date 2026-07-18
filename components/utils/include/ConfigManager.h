@@ -41,9 +41,9 @@ namespace ConfigKeys {
 
 namespace ConfigDefaults {
     constexpr uint8_t ROUTER_MODE           = 1;        // AUTO mode
-    constexpr float CONTROL_GAIN            = 200.0f;   // Proportional gain
+    constexpr float CONTROL_GAIN            = 2.0f;     // Proportional gain (rescaled for 0-10000 dimmer range)
     constexpr float BALANCE_THRESHOLD       = 10.0f;    // Watts
-    constexpr uint8_t MANUAL_LEVEL          = 0;        // 0%
+    constexpr uint16_t MANUAL_LEVEL         = 0;        // 0%
 
     constexpr float VOLTAGE_COEF            = 230.0f;   // V per V_adc
     constexpr float CURRENT_COEF            = 50.0f;    // A per V_adc (SCT-013 50A/1V)
@@ -63,7 +63,7 @@ struct SystemConfig {
     uint8_t router_mode;        ///< RouterMode enum value
     float control_gain;         ///< Proportional control gain
     float balance_threshold;    ///< Balance threshold in Watts
-    uint8_t manual_level;       ///< Manual dimmer level (0-100%)
+    uint16_t manual_level;      ///< Manual dimmer level (0-10000, hundredths of a percent)
 
     // Sensor calibration
     float voltage_coef;         ///< Voltage sensor coefficient
@@ -132,7 +132,7 @@ public:
     uint8_t getRouterMode() const { return m_config.router_mode; }
     float getControlGain() const { return m_config.control_gain; }
     float getBalanceThreshold() const { return m_config.balance_threshold; }
-    uint8_t getManualLevel() const { return m_config.manual_level; }
+    uint16_t getManualLevel() const { return m_config.manual_level; }
     float getVoltageCoef() const { return m_config.voltage_coef; }
     float getCurrentCoef() const { return m_config.current_coef; }
     float getCurrentThreshold() const { return m_config.current_threshold; }
@@ -145,7 +145,7 @@ public:
     bool setRouterMode(uint8_t mode);
     bool setControlGain(float gain);
     bool setBalanceThreshold(float threshold);
-    bool setManualLevel(uint8_t level);
+    bool setManualLevel(uint16_t level);
     bool setVoltageCoef(float coef);
     bool setCurrentCoef(float coef);
     bool setCurrentThreshold(float threshold);
@@ -193,8 +193,10 @@ private:
 
     // Load/Save individual parameters
     bool loadU8(const char* key, uint8_t& value, uint8_t defaultValue);
+    bool loadU16(const char* key, uint16_t& value, uint16_t defaultValue);
     bool loadFloat(const char* key, float& value, float defaultValue);
     bool saveU8(const char* key, uint8_t value);
+    bool saveU16(const char* key, uint16_t value);
     bool saveFloat(const char* key, float value);
 
     // State
