@@ -40,8 +40,8 @@ namespace RouterConfig {
     constexpr float MAX_CONTROL_GAIN = 1000.0f;         // Maximum allowed gain
 
     // Dimmer limits
-    constexpr uint8_t MIN_DIMMER_PERCENT = 0;           // Minimum dimmer level
-    constexpr uint8_t MAX_DIMMER_PERCENT = 100;         // Maximum dimmer level
+    constexpr uint16_t MIN_DIMMER_PERCENT = 0;           // Minimum dimmer level
+    constexpr uint16_t MAX_DIMMER_PERCENT = 10000;         // Maximum dimmer level
 
     // Update rate
     constexpr uint32_t UPDATE_INTERVAL_MS = 200;        // Matches PowerMeterADC callback interval
@@ -78,7 +78,7 @@ enum class RouterState : uint8_t {
 struct RouterStatus {
     RouterMode mode;                    ///< Current operating mode
     RouterState state;                  ///< Current control state
-    uint8_t dimmer_percent;             ///< Current dimmer level (0-100%)
+    uint16_t dimmer_percent;             ///< Current dimmer level (0-100%)
     float target_level;                 ///< Internal target level (float for smooth control)
     float power_grid;                   ///< Current grid power (W) - from CURRENT_GRID sensor
     float power_solar;                  ///< Current solar power (W) - from CURRENT_SOLAR sensor
@@ -178,13 +178,13 @@ public:
      * @brief Set manual dimmer level (only effective in MANUAL mode)
      * @param percent Dimmer level (0-100%)
      */
-    void setManualLevel(uint8_t percent);
+    void setManualLevel(uint16_t percent);
 
     /**
      * @brief Get manual dimmer level setting
      * @return Manual level setting (0-100%)
      */
-    uint8_t getManualLevel() const { return m_manual_level; }
+    uint16_t getManualLevel() const { return m_manual_level; }
 
     // === Algorithm Parameters ===
 
@@ -231,7 +231,7 @@ public:
      * @brief Get current dimmer level
      * @return Dimmer level (0-100%)
      */
-    uint8_t getDimmerLevel() const { return m_status.dimmer_percent; }
+    uint16_t getDimmerLevel() const { return m_status.dimmer_percent; }
 
     /**
      * @brief Check if controller is initialized
@@ -317,7 +317,7 @@ private:
     bool m_initialized;
 
     // Manual mode setting
-    uint8_t m_manual_level;
+    uint16_t m_manual_level;
 
     // Internal target (float for smooth control)
     float m_target_level;
