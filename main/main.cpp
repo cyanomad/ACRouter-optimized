@@ -224,7 +224,7 @@ extern "C" void app_main()
     ESP_LOGI(TAG, "Initializing DimmerHAL...");
     DimmerHAL& dimmer = DimmerHAL::getInstance();
 
-    if (!dimmer.begin(DimmerCurve::RMS)) {
+    if (!dimmer.begin()) {
         ESP_LOGE(TAG, "Failed to initialize DimmerHAL!");
         ESP_LOGE(TAG, "System halted.");
         while(1) {
@@ -233,30 +233,15 @@ extern "C" void app_main()
     }
     ESP_LOGI(TAG, "DimmerHAL initialized, frequency=%d Hz", dimmer.getMainsFrequency());
 
-    // ================================================================
-    // Apply sensor driver multipliers from profiles
-    // ================================================================
-    // For current sensors, apply multiplier from driver profile
-    // This ensures calibrated values from CurrentSensorDrivers.h are used
-    HardwareConfig& hwCfgMutable = hwConfig.config();
-    for (int ch = 0; ch < 4; ch++) {
-        ADCChannelConfig& sensor = hwCfgMutable.adc_channels[ch];
-        if (!sensor.enabled) continue;
-
-        // Apply current sensor driver multiplier from profile
-        if (isCurrentSensor(sensor.type)) {
-            float nominal, driver_multiplier, offset;
-            getCurrentSensorDefaults(sensor.current_driver, nominal, driver_multiplier, offset);
-
-            // Only apply if driver has a valid multiplier (not CUSTOM with 0)
-            if (driver_multiplier > 0.0f) {
-                ESP_LOGI(TAG, "[CH%d] Applying %s driver: multiplier %.2f -> %.2f",
-                         ch, getCurrentSensorDriverName(sensor.current_driver),
-                         sensor.multiplier, driver_multiplier);
-                sensor.multiplier = driver_multiplier;
-            }
-        }
-    }
+    // NOTE: There used to be a step here that re-applied each current
+    // channel's "driver" canonical multiplier from CurrentSensorDrivers.h
+    // on every boot. That's redundant - both the web UI (multiplier/offset
+    // fields) and the serial console (hardware-current-set, etc.) already
+    // write the final, authoritative multiplier into NVS at save time - and
+    // it was actively harmful: it silently overwrote any custom-calibrated
+    // multiplier with the driver's textbook default on every single reboot,
+    // for every current sensor. Removed. NVS-loaded values are now used
+    // as-is; see loadADCChannel() in HardwareConfigManager.cpp.
 
     // ================================================================
     // Initialize PowerMeterADC (skip in safe mode)
