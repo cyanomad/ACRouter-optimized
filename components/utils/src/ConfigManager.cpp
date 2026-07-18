@@ -100,6 +100,25 @@ bool ConfigManager::loadU8(const char* key, uint8_t& value, uint8_t defaultValue
     return true;
 }
 
+bool ConfigManager::loadU16(const char* key, uint16_t& value, uint16_t defaultValue) {
+    esp_err_t err = nvs_get_u16(m_nvs_handle, key, &value);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        value = defaultValue;
+        ESP_LOGI(TAG, "  %s: not found, using default %u", key, defaultValue);
+        return true;  // Not an error, just use default
+    } else if (err != ESP_OK) {
+        // Also catches ESP_ERR_NVS_TYPE_MISMATCH - e.g. this key was
+        // previously stored as u8 before the 0-100 -> 0-10000 migration.
+        // Falls back to default rather than failing hard; the next
+        // save() call re-writes it as u16 going forward.
+        ESP_LOGW(TAG, "  %s: read error %s, using default %u", key, esp_err_to_name(err), defaultValue);
+        value = defaultValue;
+        return false;
+    }
+    ESP_LOGI(TAG, "  %s: loaded %u", key, value);
+    return true;
+}
+
 bool ConfigManager::loadFloat(const char* key, float& value, float defaultValue) {
     // NVS doesn't have native float support, store as uint32_t (bit cast)
     uint32_t raw;
@@ -123,6 +142,28 @@ bool ConfigManager::saveU8(const char* key, uint8_t value) {
     if (!openNVS(NVS_READWRITE)) return false;
 
     esp_err_t err = nvs_set_u8(m_nvs_handle, key, value);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save %s: %s", key, esp_err_to_name(err));
+        closeNVS();
+        return false;
+    }
+
+    err = nvs_commit(m_nvs_handle);
+    closeNVS();
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to commit %s: %s", key, esp_err_to_name(err));
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Saved %s = %u", key, value);
+    return true;
+}
+
+bool ConfigManager::saveU16(const char* key, uint16_t value) {
+    if (!openNVS(NVS_READWRITE)) return false;
+
+    esp_err_t err = nvs_set_u16(m_nvs_handle, key, value);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to save %s: %s", key, esp_err_to_name(err));
         closeNVS();
@@ -178,8 +219,10 @@ bool ConfigManager::setRouterMode(uint8_t mode) {
 }
 
 bool ConfigManager::setControlGain(float gain) {
-    if (gain < 1.0f) gain = 1.0f;
-    if (gain > 1000.0f) gain = 1000.0f;
+    // Keep in sync with RouterConfig::MIN/MAX_CONTROL_GAIN (RouterController.h) -
+    // rescaled 10x/100x for the 0-10000 dimmer range (was 10.0/1000.0 for 0-100).
+    if (gain < 0.1f) gain = 0.1f;
+    if (gain > 10.0f) gain = 10.0f;
     m_config.control_gain = gain;
     return saveFloat(ConfigKeys::CONTROL_GAIN, gain);
 }
@@ -191,10 +234,10 @@ bool ConfigManager::setBalanceThreshold(float threshold) {
     return saveFloat(ConfigKeys::BALANCE_THRESHOLD, threshold);
 }
 
-bool ConfigManager::setManualLevel(uint8_t level) {
-    if (level > 100) level = 100;
+bool ConfigManager::setManualLevel(uint16_t level) {
+    if (level > 10000) level = 10000;
     m_config.manual_level = level;
-    return saveU8(ConfigKeys::MANUAL_LEVEL, level);
+    return saveU16(ConfigKeys::MANUAL_LEVEL, level);
 }
 
 bool ConfigManager::setVoltageCoef(float coef) {
@@ -245,7 +288,7 @@ bool ConfigManager::loadAll() {
     success &= loadU8(ConfigKeys::ROUTER_MODE, m_config.router_mode, ConfigDefaults::ROUTER_MODE);
     success &= loadFloat(ConfigKeys::CONTROL_GAIN, m_config.control_gain, ConfigDefaults::CONTROL_GAIN);
     success &= loadFloat(ConfigKeys::BALANCE_THRESHOLD, m_config.balance_threshold, ConfigDefaults::BALANCE_THRESHOLD);
-    success &= loadU8(ConfigKeys::MANUAL_LEVEL, m_config.manual_level, ConfigDefaults::MANUAL_LEVEL);
+    success &= loadU16(ConfigKeys::MANUAL_LEVEL, m_config.manual_level, ConfigDefaults::MANUAL_LEVEL);
 
     // Sensor calibration
     success &= loadFloat(ConfigKeys::VOLTAGE_COEF, m_config.voltage_coef, ConfigDefaults::VOLTAGE_COEF);
@@ -265,7 +308,7 @@ bool ConfigManager::saveAll() {
     success &= saveU8(ConfigKeys::ROUTER_MODE, m_config.router_mode);
     success &= saveFloat(ConfigKeys::CONTROL_GAIN, m_config.control_gain);
     success &= saveFloat(ConfigKeys::BALANCE_THRESHOLD, m_config.balance_threshold);
-    success &= saveU8(ConfigKeys::MANUAL_LEVEL, m_config.manual_level);
+    success &= saveU16(ConfigKeys::MANUAL_LEVEL, m_config.manual_level);
 
     success &= saveFloat(ConfigKeys::VOLTAGE_COEF, m_config.voltage_coef);
     success &= saveFloat(ConfigKeys::CURRENT_COEF, m_config.current_coef);
