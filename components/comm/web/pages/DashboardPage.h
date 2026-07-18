@@ -458,7 +458,7 @@ const char DASHBOARD_CONTENT[] PROGMEM = R"rawliteral(
             <input
                 type="range"
                 min="0"
-                max="9800"
+                max="10000"
                 value="0"
                 class="dimmer-slider"
                 id="dimmer-slider"
@@ -644,21 +644,25 @@ async function loadMetrics() {
     // Update dimmer levels from array
     if (data.dimmers && data.dimmers.length > 0) {
         data.dimmers.forEach((dimmer) => {
+            const level = dimmer.level;
+            if (level <= 200) level = 0;
+            if (level >= 9800) level = 10000;
+            level = level / 100;
             const levelEl = document.getElementById('dimmer-level-' + dimmer.id);
             if (levelEl) {
-                levelEl.textContent = dimmer.level;
+                levelEl.textContent = level;
             }
 
             // Update progress bar
             const progressEl = document.getElementById('dimmer-progress-' + dimmer.id);
             if (progressEl) {
-                progressEl.style.width = dimmer.level + '%';
+                progressEl.style.width = level + '%';
             }
 
             // Also update manual slider if in manual mode
             if (currentMode === 'manual' && dimmer.id === 1) {
-                document.getElementById('dimmer-slider').value = dimmer.level;
-                document.getElementById('dimmer-slider-value').textContent = (dimmer.level >= 9800 ? 10000 : dimmer.level) / 100;
+                document.getElementById('dimmer-slider').value = level;
+                document.getElementById('dimmer-slider-value').textContent = level;
             }
         });
     }
