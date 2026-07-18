@@ -1549,14 +1549,14 @@ bool SerialCommand::handleConfigCommand(const char* cmd, const char* arg) {
         return true;
     }
 
-    // config-manual <0-100> - set manual level
+    // config-manual <0-10000> - set manual level (hundredths of a percent)
     if (strcmp(cmd, "config-manual") == 0) {
         if (!arg) {
-            ESP_LOGI(TAG, "manual = %d%%", m_config->getManualLevel());
+            ESP_LOGI(TAG, "manual = %d", m_config->getManualLevel());
         } else {
-            uint8_t value = (uint8_t)atoi(arg);
+            uint16_t value = (uint16_t)atoi(arg);
             if (m_config->setManualLevel(value)) {
-                ESP_LOGI(TAG, "manual = %d%% (saved)", m_config->getManualLevel());
+                ESP_LOGI(TAG, "manual = %d (saved)", m_config->getManualLevel());
                 if (m_router) m_router->setManualLevel(value);
             } else {
                 ESP_LOGE(TAG, "Failed to save manual level");
@@ -1704,8 +1704,8 @@ bool SerialCommand::handleRouterCommand(const char* cmd, const char* arg) {
             }
 
             // Get value
-            uint8_t value = (uint8_t)atoi(space + 1);
-            if (value > 100) value = 100;
+            uint16_t value = (uint16_t)atoi(space + 1);
+            if (value > 10000) value = 10000;
 
             if (m_router) {
                 // Set manual mode and level
