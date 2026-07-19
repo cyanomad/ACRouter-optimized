@@ -41,7 +41,7 @@ namespace RouterConfig {
     // change - otherwise AUTO/ECO mode will take ~100x longer to reach a
     // given target level for the same power error.
     constexpr float DEFAULT_CONTROL_GAIN = 2.0f;        // Proportional gain (higher = slower response)
-    constexpr float DEFAULT_BALANCE_THRESHOLD = 10.0f;  // W, threshold for "balanced" state (unaffected - real watts)
+    constexpr float DEFAULT_BALANCE_THRESHOLD = 20.0f;  // W, threshold for "balanced" state (unaffected - real watts)
     constexpr float MIN_CONTROL_GAIN = 0.1f;            // Minimum allowed gain
     constexpr float MAX_CONTROL_GAIN = 10.0f;           // Maximum allowed gain
 
