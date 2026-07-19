@@ -144,7 +144,7 @@ void RouterController::processAutoMode(float power_grid) {
     float error = -power_grid;  // Invert: export = positive error
 
     // Check if within balance threshold
-    if (fabs(power_grid) <= m_status.balance_threshold) {
+    if (power_grid >= 0.0f && power_grid <= m_status.balance_threshold) {
         // Within threshold - hold current level
         updateState(power_grid);
         return;
@@ -332,7 +332,7 @@ void RouterController::updateState(float power_grid) {
         m_status.state = RouterState::AT_MAXIMUM;
     } else if (m_status.dimmer_percent <= RouterConfig::MIN_DIMMER_PERCENT) {
         m_status.state = RouterState::AT_MINIMUM;
-    } else if (power_grid < -m_status.balance_threshold) {
+    } else if (power_grid < 0.0f) {
         m_status.state = RouterState::INCREASING;  // Exporting, need more load
     } else if (power_grid > m_status.balance_threshold) {
         m_status.state = RouterState::DECREASING;  // Importing, need less load
