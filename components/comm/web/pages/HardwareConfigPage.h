@@ -304,9 +304,9 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                     <select class="form-control" id="adc0-type" onchange="populateSensorProfiles(0)">
                         <option value="0">NONE</option>
                         <option value="1" selected>VOLTAGE_AC</option>
-                        <option value="2">CURRENT_LOAD</option>
-                        <option value="3">CURRENT_GRID</option>
-                        <option value="4">CURRENT_SOLAR</option>
+                        <option value="20">CURRENT_LOAD</option>
+                        <option value="10">CURRENT_GRID</option>
+                        <option value="11">CURRENT_SOLAR</option>
                     </select>
                 </div>
 
@@ -345,6 +345,20 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                         </div>
                     </div>
                 </div>
+
+                <!-- Custom Calibration (shown when "Custom Calibration..." is selected) -->
+                <div id="adc0-custom-cal" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label">Custom Multiplier</label>
+                        <input type="number" class="form-control" id="adc0-mult-input" value="1.0" step="0.01"
+                               oninput="document.getElementById('adc0-mult').value = this.value">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Custom Offset</label>
+                        <input type="number" class="form-control" id="adc0-offset-input" value="0.0" step="0.01"
+                               oninput="document.getElementById('adc0-offset').value = this.value">
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -379,9 +393,9 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                     <select class="form-control" id="adc1-type" onchange="populateSensorProfiles(1)">
                         <option value="0">NONE</option>
                         <option value="1">VOLTAGE_AC</option>
-                        <option value="2" selected>CURRENT_LOAD</option>
-                        <option value="3">CURRENT_GRID</option>
-                        <option value="4">CURRENT_SOLAR</option>
+                        <option value="20" selected>CURRENT_LOAD</option>
+                        <option value="10">CURRENT_GRID</option>
+                        <option value="11">CURRENT_SOLAR</option>
                     </select>
                 </div>
 
@@ -420,6 +434,20 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                         </div>
                     </div>
                 </div>
+
+                <!-- Custom Calibration (shown when "Custom Calibration..." is selected) -->
+                <div id="adc1-custom-cal" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label">Custom Multiplier</label>
+                        <input type="number" class="form-control" id="adc1-mult-input" value="1.0" step="0.01"
+                               oninput="document.getElementById('adc1-mult').value = this.value">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Custom Offset</label>
+                        <input type="number" class="form-control" id="adc1-offset-input" value="0.0" step="0.01"
+                               oninput="document.getElementById('adc1-offset').value = this.value">
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -454,9 +482,9 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                     <select class="form-control" id="adc2-type" onchange="populateSensorProfiles(2)">
                         <option value="0">NONE</option>
                         <option value="1">VOLTAGE_AC</option>
-                        <option value="2">CURRENT_LOAD</option>
-                        <option value="3" selected>CURRENT_GRID</option>
-                        <option value="4">CURRENT_SOLAR</option>
+                        <option value="20">CURRENT_LOAD</option>
+                        <option value="10" selected>CURRENT_GRID</option>
+                        <option value="11">CURRENT_SOLAR</option>
                     </select>
                 </div>
 
@@ -495,6 +523,20 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                         </div>
                     </div>
                 </div>
+
+                <!-- Custom Calibration (shown when "Custom Calibration..." is selected) -->
+                <div id="adc2-custom-cal" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label">Custom Multiplier</label>
+                        <input type="number" class="form-control" id="adc2-mult-input" value="1.0" step="0.01"
+                               oninput="document.getElementById('adc2-mult').value = this.value">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Custom Offset</label>
+                        <input type="number" class="form-control" id="adc2-offset-input" value="0.0" step="0.01"
+                               oninput="document.getElementById('adc2-offset').value = this.value">
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -529,9 +571,9 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                     <select class="form-control" id="adc3-type" onchange="populateSensorProfiles(3)">
                         <option value="0">NONE</option>
                         <option value="1">VOLTAGE_AC</option>
-                        <option value="2">CURRENT_LOAD</option>
-                        <option value="3">CURRENT_GRID</option>
-                        <option value="4" selected>CURRENT_SOLAR</option>
+                        <option value="20">CURRENT_LOAD</option>
+                        <option value="10">CURRENT_GRID</option>
+                        <option value="11" selected>CURRENT_SOLAR</option>
                     </select>
                 </div>
 
@@ -568,6 +610,20 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                             <span class="label">Calibrated:</span>
                             <span class="value"></span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Custom Calibration (shown when "Custom Calibration..." is selected) -->
+                <div id="adc3-custom-cal" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label">Custom Multiplier</label>
+                        <input type="number" class="form-control" id="adc3-mult-input" value="1.0" step="0.01"
+                               oninput="document.getElementById('adc3-mult').value = this.value">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Custom Offset</label>
+                        <input type="number" class="form-control" id="adc3-offset-input" value="0.0" step="0.01"
+                               oninput="document.getElementById('adc3-offset').value = this.value">
                     </div>
                 </div>
             </div>
@@ -639,6 +695,19 @@ const char HARDWARE_CONFIG_CONTENT[] PROGMEM = R"rawliteral(
                     <label class="form-label">GPIO Pin</label>
                     <input type="number" class="form-control" id="zerocross-gpio" value="18" min="0" max="39">
                     <div class="form-helper">Interrupt-capable GPIO required</div>
+                </div>
+            </div>
+
+            <!-- Control Loop -->
+            <div class="channel-config">
+                <div class="channel-header">
+                    <span class="channel-title">Control Loop</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Control Gain</label>
+                    <input type="number" class="form-control" id="control-gain" value="2.0" min="0.1" max="10.0" step="0.1">
+                    <div class="form-helper">Proportional gain for AUTO/ECO power balancing — higher = slower, more stable response; lower = faster, more aggressive</div>
                 </div>
             </div>
         </div>
@@ -798,9 +867,9 @@ function populateSensorProfiles(channel) {
         case '1': // VOLTAGE_AC
             filterType = 'VOLTAGE_AC';
             break;
-        case '2': // CURRENT_LOAD
-        case '3': // CURRENT_GRID
-        case '4': // CURRENT_SOLAR
+        case '20': // CURRENT_LOAD
+        case '10': // CURRENT_GRID
+        case '11': // CURRENT_SOLAR
             filterType = 'CURRENT';
             break;
         default:
@@ -851,6 +920,12 @@ function populateSensorProfiles(channel) {
         }
         driverSelect.appendChild(acsGroup);
     }
+
+    // Manual calibration option - always available for voltage/current types
+    const customOption = document.createElement('option');
+    customOption.value = 'CUSTOM';
+    customOption.textContent = '🛠️ Custom Calibration...';
+    driverSelect.appendChild(customOption);
 }
 
 // ============================================================
@@ -859,6 +934,21 @@ function populateSensorProfiles(channel) {
 function applySensorProfile(channel, profileId) {
     const profile = SENSOR_PROFILES[profileId];
     const infoBox = document.getElementById(`adc${channel}-profile-info`);
+    const customBox = document.getElementById(`adc${channel}-custom-cal`);
+
+    if (profileId === 'CUSTOM') {
+        // Manual calibration: hide the fixed-profile info box, reveal
+        // editable multiplier/offset inputs pre-filled with whatever is
+        // currently stored, and let the user type exact values.
+        infoBox.style.display = 'none';
+        customBox.style.display = 'block';
+        document.getElementById(`adc${channel}-mult-input`).value =
+            document.getElementById(`adc${channel}-mult`).value;
+        document.getElementById(`adc${channel}-offset-input`).value =
+            document.getElementById(`adc${channel}-offset`).value;
+        return;
+    }
+    customBox.style.display = 'none';
 
     if (!profile) {
         // No profile selected - hide info box
@@ -933,7 +1023,7 @@ function findProfileIdForChannel(sensorType, multiplier, offset) {
     for (const [id, profile] of Object.entries(SENSOR_PROFILES)) {
         if (type === '1') {
             if (profile.sensorType !== 'VOLTAGE_AC') continue;
-        } else if (type === '2' || type === '3' || type === '4') {
+        } else if (type === '20' || type === '10' || type === '11') {
             if (profile.category !== 'sct013' && profile.category !== 'acs712') continue;
         } else {
             continue;
@@ -979,6 +1069,15 @@ async function loadHardwareConfig() {
         if (matchedId) {
             driverSelect.value = matchedId;
             applySensorProfile(i, matchedId);
+        } else if (ch.type !== 0) {
+            // Saved calibration doesn't match any known profile (e.g. you
+            // set a manually measured multiplier/offset) - fall back to
+            // "Custom Calibration" so the actual values are visible and
+            // editable instead of silently hidden.
+            document.getElementById(`adc${i}-mult`).value = ch.multiplier;
+            document.getElementById(`adc${i}-offset`).value = ch.offset;
+            driverSelect.value = 'CUSTOM';
+            applySensorProfile(i, 'CUSTOM');
         } else {
             driverSelect.value = '';
             document.getElementById(`adc${i}-profile-info`).style.display = 'none';
@@ -995,6 +1094,13 @@ async function loadHardwareConfig() {
     document.getElementById('dimmer1-enabled').checked = data.dimmer_ch1.enabled;
     document.getElementById('dimmer2-gpio').value = data.dimmer_ch2.gpio;
     document.getElementById('dimmer2-enabled').checked = data.dimmer_ch2.enabled;
+
+    // Control gain lives in a separate config namespace (/api/config),
+    // not /api/hardware/config - fetch it separately.
+    const generalConfig = await apiGet('config');
+    if (generalConfig && generalConfig.control_gain !== undefined) {
+        document.getElementById('control-gain').value = generalConfig.control_gain;
+    }
 
     // Load zero-cross
     document.getElementById('zerocross-gpio').value = data.zerocross_gpio;
@@ -1113,14 +1219,19 @@ async function saveConfig() {
 
     const result = await apiPost('hardware/config', config);
 
+    // Control gain lives in a separate config namespace (/api/config)
+    const gainResult = await apiPost('config', {
+        control_gain: parseFloat(document.getElementById('control-gain').value)
+    });
+
     hideLoading();
 
     if (!result) return;
 
-    if (result.success) {
+    if (result.success && (!gainResult || gainResult.success)) {
         showAlert('Configuration saved to NVS successfully!', 'success');
     } else {
-        showAlert('Failed to save: ' + (result.error || 'Unknown error'), 'error');
+        showAlert('Failed to save: ' + (result.error || (gainResult && gainResult.error) || 'Unknown error'), 'error');
     }
 }
 
@@ -1144,6 +1255,11 @@ async function saveAndReboot() {
         showAlert('Failed to save configuration!', 'error');
         return;
     }
+
+    // Control gain lives in a separate config namespace (/api/config)
+    await apiPost('config', {
+        control_gain: parseFloat(document.getElementById('control-gain').value)
+    });
 
     // Then request reboot
     const rebootResult = await apiPost('system/reboot', {});
