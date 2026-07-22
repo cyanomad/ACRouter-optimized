@@ -644,10 +644,11 @@ async function loadMetrics() {
     // Update dimmer levels from array
     if (data.dimmers && data.dimmers.length > 0) {
         data.dimmers.forEach((dimmer) => {
-            const level = dimmer.level;
+            let level = dimmer.level;
             if (level <= 200) level = 0;
             if (level >= 9800) level = 10000;
-            level = level / 100;
+            const rawLevel = level;      // keep 0-10000 for the <input type="range"> (its min/max are 0-10000)
+            level = level / 100;         // 0-100 percent, for the text/progress-bar display below
             const levelEl = document.getElementById('dimmer-level-' + dimmer.id);
             if (levelEl) {
                 levelEl.textContent = level;
@@ -661,7 +662,7 @@ async function loadMetrics() {
 
             // Also update manual slider if in manual mode
             if (currentMode === 'manual' && dimmer.id === 1) {
-                document.getElementById('dimmer-slider').value = level;
+                document.getElementById('dimmer-slider').value = rawLevel;
                 document.getElementById('dimmer-slider-value').textContent = level;
             }
         });
