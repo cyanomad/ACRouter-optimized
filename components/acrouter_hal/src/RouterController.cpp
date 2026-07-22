@@ -142,6 +142,8 @@ void RouterController::processAutoMode(float power_grid) {
     // Proportional control: target_level += error / control_gain
 
     float error = -power_grid;  // Invert: export = positive error
+    int added_correction = 2;
+    if (error < 0) added_correction = -added_correction;
 
     // Check if within balance threshold
     if (power_grid >= 0.0f && power_grid <= m_status.balance_threshold) {
@@ -150,8 +152,8 @@ void RouterController::processAutoMode(float power_grid) {
         return;
     }
 
-    // Proportional control
-    float delta = error / m_status.control_gain;
+    // Quadratic control
+    float delta = error / 10 * abs(error) / m_status.control_gain + added_correction;
     m_target_level += delta;
 
     // Apply new level
